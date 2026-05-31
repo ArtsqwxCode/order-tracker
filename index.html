@@ -72,6 +72,7 @@
             display: flex;
             flex-direction: column;
             position: relative;
+            margin-bottom: 35px;
         }
         .step {
             display: flex;
@@ -86,7 +87,7 @@
         .step::before {
             content: '';
             position: absolute;
-            left: 7px; /* Ровно по центру кружка (14px / 2) */
+            left: 7px;
             top: 14px;
             width: 2px;
             height: calc(100% - 6px);
@@ -94,10 +95,10 @@
             z-index: 1;
         }
         .step.done::before {
-            background-color: #34c759; /* Зеленая линия для пройденных */
+            background-color: #34c759;
         }
         .step.active::before {
-            background-color: #e5e5ea; /* Линия после текущего остается серой */
+            background-color: #e5e5ea;
         }
         .step:last-child::before {
             display: none;
@@ -116,7 +117,6 @@
             justify-content: center;
             box-sizing: border-box;
         }
-        /* Прошедший статус: зеленый с мини-галочкой */
         .step.done .indicator {
             background-color: #34c759;
         }
@@ -129,12 +129,10 @@
             transform: rotate(45deg);
             margin-bottom: 2px;
         }
-        /* Текущий статус: синий */
         .step.active .indicator {
             background-color: #007aff;
             box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.2);
         }
-        /* Будущий статус: серый */
         .step.pending .indicator {
             background-color: #e5e5ea;
         }
@@ -142,7 +140,6 @@
         .step-text {
             font-size: 15px;
             line-height: 1.2;
-            padding-top: 0px;
         }
         .step.pending .step-text {
             color: #aeaeb2;
@@ -154,6 +151,23 @@
         .step.done .step-text {
             color: #1c1c1e;
             font-weight: 500;
+        }
+        /* Блок "Обновлено" внизу */
+        .updated-box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #8e8e93;
+            font-size: 16px; /* Крупный и читаемый шрифт, как ты просил */
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid #f2f2f7;
+        }
+        .updated-box svg {
+            width: 18px;
+            height: 18px;
+            fill: #8e8e93;
+            flex-shrink: 0;
         }
     </style>
 </head>
@@ -170,6 +184,13 @@
         
         <h3 class="section-title">Статус доставки</h3>
         <div id="status-list" class="timeline"></div>
+
+        <div id="updated-container" class="updated-box" style="display: none;">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+            </svg>
+            <span id="updated-text">Обновлено: ...</span>
+        </div>
     </div>
 
     <script>
@@ -187,7 +208,6 @@
             "7. Доставлено / Закрыто"
         ];
 
-        // Умный парсер CSV, учитывающий кавычки и запятые внутри текста
         function parseCSVLine(text) {
             let ret = [];
             let inQuote = false;
@@ -208,7 +228,7 @@
         }
 
         async function init() {
-            const orderId = new URLSearchParams(window.location.search).get('order') || "943001";
+            const orderId = new URLSearchParams(window.location.search).get('order') || "";
             document.getElementById('order-num').innerText = "№" + orderId;
 
             try {
@@ -216,14 +236,14 @@
                 const csvText = await res.text();
                 const lines = csvText.replace(/\r/g, '').split('\n');
                 
-                // Читаем заголовки со 3-й строки таблицы (индекс 2)
                 const headers = parseCSVLine(lines[2]);
                 const orderIdx = headers.findIndex(h => h.toLowerCase().includes("заказ") || h.toLowerCase().includes("id"));
                 const fioIdx = headers.findIndex(h => h.toLowerCase().includes("фио") || h.toLowerCase().includes("контакт"));
                 const statusIdx = headers.findIndex(h => h.toLowerCase().includes("статус"));
                 const photoIdx = headers.findIndex(h => h.toLowerCase().includes("фото") || h.toLowerCase().includes("ссылка"));
+                // Ищем колонку с датой изменения/обновления
+                const updatedIdx = headers.findIndex(h => h.toLowerCase().includes("обновлен") || h.toLowerCase().includes("дата") || h.toLowerCase().includes("время"));
 
-                // Ищем нужную строку с заказом
                 let foundRow = null;
                 for (let i = 3; i < lines.length; i++) {
                     if (!lines[i]) continue;
@@ -235,14 +255,18 @@
                 }
 
                 if (foundRow) {
-                    // Заполняем ФИО и Фото
                     document.getElementById('receiver').innerHTML = "Получатель: <span>" + (foundRow[fioIdx] || "Не указан") + "</span>";
                     
                     if (foundRow[photoIdx] && foundRow[photoIdx].startsWith('http')) {
                         document.getElementById('photo').src = foundRow[photoIdx];
                     }
 
-                    // Определяем текущий статус по первой цифре строки
+                    // Вывод даты обновления
+                    if (updatedIdx !== -1 && foundRow[updatedIdx]) {
+                        document.getElementById('updated-text').innerText = "Обновлено: " + foundRow[updatedIdx];
+                        document.getElementById('updated-container').style.display = 'flex';
+                    }
+
                     const currentStatus = foundRow[statusIdx] || "";
                     const matchNum = currentStatus.match(/^\d+/);
                     let curIdx = -1;
@@ -253,7 +277,6 @@
                         curIdx = statuses.findIndex(s => s.toLowerCase().includes(currentStatus.toLowerCase()));
                     }
 
-                    // Генерируем таймлайн
                     const list = document.getElementById('status-list');
                     statuses.forEach((s, i) => {
                         const div = document.createElement('div');
@@ -266,10 +289,10 @@
                         list.appendChild(div);
                     });
                 } else {
-                    document.getElementById('receiver').innerHTML = "<span style='color:#ff3b30;'>Заказ не найден в базе</span>";
+                    document.getElementById('receiver').innerHTML = "<span style='color:#ff3b30;'>Заказ не найден</span>";
                 }
             } catch (e) {
-                document.getElementById('receiver').innerHTML = "<span style='color:#ff3b30;'>Ошибка загрузки данных</span>";
+                document.getElementById('receiver').innerHTML = "<span style='color:#ff3b30;'>Ошибка загрузки базы данных</span>";
             }
         }
         init();
