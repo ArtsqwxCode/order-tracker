@@ -18,6 +18,21 @@
             width: 100%;
             box-sizing: border-box;
         }
+        
+        /* Базовый класс для анимации появления */
+        .fade-in-up {
+            opacity: 0;
+            transform: translateY(16px);
+            animation: fadeInUp 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         .header {
             display: flex;
             align-items: center;
@@ -25,6 +40,7 @@
             margin-bottom: 28px;
             border-bottom: 1px solid #f2f2f7;
             padding-bottom: 20px;
+            animation-delay: 0.1s;
         }
         .img-preview {
             width: 70px;
@@ -67,6 +83,7 @@
             letter-spacing: 1.2px;
             color: #8e8e93;
             margin: 0 0 24px 0;
+            animation-delay: 0.2s;
         }
         .timeline {
             display: flex;
@@ -83,6 +100,7 @@
         .step:last-child {
             padding-bottom: 0;
         }
+        
         /* Линия трекера */
         .step::before {
             content: '';
@@ -103,6 +121,7 @@
         .step:last-child::before {
             display: none;
         }
+        
         /* Кружки статусов */
         .indicator {
             width: 16px;
@@ -136,6 +155,7 @@
         .step.pending .indicator {
             background-color: #e5e5ea;
         }
+        
         /* Текст статусов */
         .step-text {
             font-size: 15px;
@@ -152,13 +172,14 @@
             color: #1c1c1e;
             font-weight: 500;
         }
+        
         /* Блок "Обновлено" внизу */
         .updated-box {
             display: flex;
             align-items: center;
             gap: 8px;
             color: #8e8e93;
-            font-size: 16px; /* Крупный и читаемый шрифт, как ты просил */
+            font-size: 16px; 
             margin-top: 25px;
             padding-top: 20px;
             border-top: 1px solid #f2f2f7;
@@ -173,7 +194,7 @@
 </head>
 <body>
     <div class="app-container">
-        <div class="header">
+        <div id="app-header" class="header fade-in-up">
             <img id="photo" class="img-preview" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='70' height='70' viewBox='0 0 70 70'><rect width='70' height='70' fill='%23f2f2f7'/></svg>" alt="Товар">
             <div class="header-text">
                 <div class="order-label">Заказ</div>
@@ -182,10 +203,11 @@
             </div>
         </div>
         
-        <h3 class="section-title">Статус доставки</h3>
+        <h3 id="app-title" class="section-title fade-in-up">Статус доставки</h3>
+        
         <div id="status-list" class="timeline"></div>
 
-        <div id="updated-container" class="updated-box" style="display: none;">
+        <div id="updated-container" class="updated-box fade-in-up" style="display: none;">
             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
             </svg>
@@ -241,8 +263,9 @@
                 const fioIdx = headers.findIndex(h => h.toLowerCase().includes("фио") || h.toLowerCase().includes("контакт"));
                 const statusIdx = headers.findIndex(h => h.toLowerCase().includes("статус"));
                 const photoIdx = headers.findIndex(h => h.toLowerCase().includes("фото") || h.toLowerCase().includes("ссылка"));
-                // Ищем колонку с датой изменения/обновления
-                const updatedIdx = headers.findIndex(h => h.toLowerCase().includes("обновлен") || h.toLowerCase().includes("дата") || h.toLowerCase().includes("время"));
+                
+                // СТРОГОЕ совпадение для даты обновления, чтобы обойти "Дату отправки"
+                const updatedIdx = headers.findIndex(h => h.toLowerCase() === "дата обновления");
 
                 let foundRow = null;
                 for (let i = 3; i < lines.length; i++) {
@@ -261,7 +284,7 @@
                         document.getElementById('photo').src = foundRow[photoIdx];
                     }
 
-                    // Вывод даты обновления
+                    // Выводим точную дату из столбца "Дата обновления"
                     if (updatedIdx !== -1 && foundRow[updatedIdx]) {
                         document.getElementById('updated-text').innerText = "Обновлено: " + foundRow[updatedIdx];
                         document.getElementById('updated-container').style.display = 'flex';
@@ -278,16 +301,25 @@
                     }
 
                     const list = document.getElementById('status-list');
+                    let delayStep = 0.3; // Начальная задержка для первого статуса
+
                     statuses.forEach((s, i) => {
                         const div = document.createElement('div');
                         let stateClass = 'pending';
                         if (i < curIdx) stateClass = 'done';
                         else if (i === curIdx) stateClass = 'active';
 
-                        div.className = `step ${stateClass}`;
+                        // Добавляем класс анимации и высчитываем шаг задержки
+                        div.className = `step ${stateClass} fade-in-up`;
+                        div.style.animationDelay = `${delayStep}s`;
+                        delayStep += 0.12; // Каждые последующие шаги выходят на 0.12с позже
+
                         div.innerHTML = `<div class="indicator"></div><div class="step-text">${s}</div>`;
                         list.appendChild(div);
                     });
+
+                    // Анимация для нижнего блока «Обновлено» запускается после всех статусов
+                    document.getElementById('updated-container').style.animationDelay = `${delayStep}s`;
                 } else {
                     document.getElementById('receiver').innerHTML = "<span style='color:#ff3b30;'>Заказ не найден</span>";
                 }
