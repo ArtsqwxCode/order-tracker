@@ -3,70 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Мой заказ</title>
+    <title>Статус заказа</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f6f8; padding: 20px; margin: 0; }
-        .card { background: white; border-radius: 24px; padding: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.06); }
-        .header { display: flex; align-items: center; gap: 15px; margin-bottom: 25px; }
-        .img-box { width: 80px; height: 80px; border-radius: 16px; object-fit: cover; background: #eee; }
-        .title { margin: 0; font-size: 18px; color: #1c1c1e; }
-        .subtitle { color: #8e8e93; font-size: 14px; }
-        .timeline { margin-top: 20px; }
-        .step { display: flex; align-items: flex-start; gap: 15px; margin-bottom: 20px; position: relative; }
-        .step::after { content: ''; position: absolute; left: 11px; top: 30px; height: 25px; width: 2px; background: #e5e5ea; }
-        .step:last-child::after { display: none; }
-        .dot { width: 24px; height: 24px; border-radius: 50%; background: #e5e5ea; border: 4px solid #fff; box-shadow: 0 0 0 2px #e5e5ea; }
-        .active .dot { background: #007aff; box-shadow: 0 0 0 2px #007aff; }
-        .done .dot { background: #34c759; box-shadow: 0 0 0 2px #34c759; }
-        .step-text { font-size: 15px; color: #1c1c1e; padding-top: 2px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background-color: #f5f5f7; padding: 20px; }
+        .card { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .header { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; }
+        .img-preview { width: 60px; height: 60px; border-radius: 10px; background: #eee; object-fit: cover; }
+        .step { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+        .step.active { color: #007aff; font-weight: bold; }
+        .step.done { color: #34c759; }
+        .step.pending { color: #8e8e93; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; background: #ccc; }
+        .active .dot { background: #007aff; box-shadow: 0 0 8px #007aff; }
+        .done .dot { background: #34c759; }
     </style>
 </head>
 <body>
     <div class="card">
         <div class="header">
-            <img id="item-img" class="img-box" src="" alt="Фото">
+            <img id="photo" class="img-preview" src="" alt="">
             <div>
-                <h2 id="order-id" class="title">Заказ №...</h2>
-                <div id="receiver" class="subtitle">Получатель: ...</div>
+                <h2 id="order-num" style="margin:0">Заказ №...</h2>
+                <div id="receiver" style="color:gray">Получатель: ...</div>
             </div>
         </div>
-        <div id="timeline" class="timeline"></div>
+        <div id="status-list"></div>
     </div>
 
     <script>
-        const tg = window.Telegram.WebApp;
-        tg.ready();
-        tg.expand();
-
         const statuses = ["1. Едет от продавца на склад в ЕС.", "2. На складе в ЕС", "3. В пути на промежуточный склад в ЕС.", "4. На промежуточном складе в ЕС.", "5. На пути в РБ", "6. На почте в РБ", "7. Доставлено / Закрыто"];
+        
+        async function init() {
+            const params = new URLSearchParams(window.location.search);
+            const orderId = params.get('order');
+            document.getElementById('order-num').innerText = "Заказ №" + orderId;
 
-        async function load() {
-            const id = new URLSearchParams(window.location.search).get('order');
             const res = await fetch("https://docs.google.com/spreadsheets/d/1ud4t6ga4HiN2D-57Z9mR54E7j3psalztGFMNlREurC4/export?format=csv&gid=793575032");
-            const csv = await res.text();
-            const rows = csv.split('\n').slice(3);
-            const row = rows.find(r => r.split(',')[0].trim() == id);
+            const data = await res.text();
+            const rows = data.split('\n').slice(3);
+            const row = rows.find(r => r.split(',')[0].trim() == orderId);
 
-            if(row) {
+            if (row) {
                 const cols = row.split(',');
-                document.getElementById('order-id').innerText = "Заказ №" + id;
-                document.getElementById('receiver').innerText = "Получатель: " + cols[1];
-                document.getElementById('item-img').src = cols[2]; // Ссылка на фото
+                document.getElementById('receiver').innerText = "Получатель: " + (cols[1] || "Не указан");
+                document.getElementById('photo').src = cols[2] || ""; // Ссылка на фото
                 
-                const curStatus = cols[2].trim(); // Убедись, что колонка статуса совпадает с индексом
-                const curIdx = statuses.indexOf(curStatus);
+                const currentStatus = cols[2].trim(); 
+                const curIdx = statuses.indexOf(currentStatus);
                 
-                const list = document.getElementById('timeline');
+                const list = document.getElementById('status-list');
                 statuses.forEach((s, i) => {
                     const div = document.createElement('div');
-                    div.className = 'step ' + (i < curIdx ? 'done' : i == curIdx ? 'active' : '');
-                    div.innerHTML = `<div class="dot"></div><div class="step-text">${s}</div>`;
+                    div.className = 'step ' + (i < curIdx ? 'done' : i == curIdx ? 'active' : 'pending');
+                    div.innerHTML = `<div class="dot"></div>${s}`;
                     list.appendChild(div);
                 });
             }
         }
-        load();
+        init();
     </script>
 </body>
 </html>
