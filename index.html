@@ -3,38 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Статус заказа</title>
+    <title>Мой заказ</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: sans-serif; background: #f8f9fa; padding: 20px; }
-        .card { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        .step { display: flex; align-items: center; padding: 12px; border-bottom: 1px solid #eee; }
-        .done { color: #2ecc71; }
-        .active { color: #3498db; font-weight: bold; }
-        .inactive { color: #ccc; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f6f8; padding: 20px; margin: 0; }
+        .card { background: white; border-radius: 24px; padding: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.06); }
+        .header { display: flex; align-items: center; gap: 15px; margin-bottom: 25px; }
+        .img-box { width: 80px; height: 80px; border-radius: 16px; object-fit: cover; background: #eee; }
+        .title { margin: 0; font-size: 18px; color: #1c1c1e; }
+        .subtitle { color: #8e8e93; font-size: 14px; }
+        .timeline { margin-top: 20px; }
+        .step { display: flex; align-items: flex-start; gap: 15px; margin-bottom: 20px; position: relative; }
+        .step::after { content: ''; position: absolute; left: 11px; top: 30px; height: 25px; width: 2px; background: #e5e5ea; }
+        .step:last-child::after { display: none; }
+        .dot { width: 24px; height: 24px; border-radius: 50%; background: #e5e5ea; border: 4px solid #fff; box-shadow: 0 0 0 2px #e5e5ea; }
+        .active .dot { background: #007aff; box-shadow: 0 0 0 2px #007aff; }
+        .done .dot { background: #34c759; box-shadow: 0 0 0 2px #34c759; }
+        .step-text { font-size: 15px; color: #1c1c1e; padding-top: 2px; }
     </style>
 </head>
 <body>
     <div class="card">
-        <h2 id="title">Загрузка...</h2>
-        <div id="list"></div>
+        <div class="header">
+            <img id="item-img" class="img-box" src="" alt="Фото">
+            <div>
+                <h2 id="order-id" class="title">Заказ №...</h2>
+                <div id="receiver" class="subtitle">Получатель: ...</div>
+            </div>
+        </div>
+        <div id="timeline" class="timeline"></div>
     </div>
+
     <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
         const statuses = ["1. Едет от продавца на склад в ЕС.", "2. На складе в ЕС", "3. В пути на промежуточный склад в ЕС.", "4. На промежуточном складе в ЕС.", "5. На пути в РБ", "6. На почте в РБ", "7. Доставлено / Закрыто"];
+
         async function load() {
             const id = new URLSearchParams(window.location.search).get('order');
-            document.getElementById('title').innerText = "Заказ №" + id;
             const res = await fetch("https://docs.google.com/spreadsheets/d/1ud4t6ga4HiN2D-57Z9mR54E7j3psalztGFMNlREurC4/export?format=csv&gid=793575032");
             const csv = await res.text();
-            const row = csv.split('\n').slice(3).find(r => r.split(',')[0].trim() == id);
+            const rows = csv.split('\n').slice(3);
+            const row = rows.find(r => r.split(',')[0].trim() == id);
+
             if(row) {
-                const cur = row.split(',')[2].trim();
-                const curIdx = statuses.indexOf(cur);
+                const cols = row.split(',');
+                document.getElementById('order-id').innerText = "Заказ №" + id;
+                document.getElementById('receiver').innerText = "Получатель: " + cols[1];
+                document.getElementById('item-img').src = cols[2]; // Ссылка на фото
+                
+                const curStatus = cols[2].trim(); // Убедись, что колонка статуса совпадает с индексом
+                const curIdx = statuses.indexOf(curStatus);
+                
+                const list = document.getElementById('timeline');
                 statuses.forEach((s, i) => {
                     const div = document.createElement('div');
-                    div.className = 'step ' + (i < curIdx ? 'done' : i == curIdx ? 'active' : 'inactive');
-                    div.innerText = (i < curIdx ? '✅ ' : i == curIdx ? '➡️ ' : '⚪ ') + s;
-                    document.getElementById('list').appendChild(div);
+                    div.className = 'step ' + (i < curIdx ? 'done' : i == curIdx ? 'active' : '');
+                    div.innerHTML = `<div class="dot"></div><div class="step-text">${s}</div>`;
+                    list.appendChild(div);
                 });
             }
         }
